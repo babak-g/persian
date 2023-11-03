@@ -1,0 +1,21 @@
+---
+import Config from '../config.cjs';
+import Layout from '../layouts/index.astro';
+import ConverterPane from '../components/converter/ConverterPane.astro';
+
+
+export async function getStaticPaths({ paginate }) {
+  let allPosts = ""
+  
+    return paginate(allPosts, {
+      pageSize: Config.paginate,
+    })
+}
+
+const title = Config.siteTitle;
+const { page } = Astro.props;
+
+---
+<Layout title={title} lang="en">
+  <ConverterPane title={title} posts={page.data} page={page} />
+</Layout>
