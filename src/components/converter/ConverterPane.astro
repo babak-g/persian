@@ -17,28 +17,198 @@ const { title, posts, page, url } = Astro.props;
   <div class="container py-4">
     <astro-heart>
       <textarea name="inputPane"></textarea>
-      <textarea disabled name="outputPane"></textarea>
+      <textarea name="outputPane"></textarea>
     </astro-heart>
   </div>
 </div>
 
 <script>
-  // Define the behaviour for our new type of HTML element.
-  class Translator extends HTMLElement {
-    constructor() {
-      super();
 
-      const inputPane = this.querySelector("textarea[name='inputPane']");
-      const outputPane = this.querySelector("textarea[name='outputPane']");
+    const englishFarsiMap = {
+      "aa": "ا",
+      "b": "ب",
+      "p": "پ",
+      "t":"ت",
+      "st":"ث", 
+      "j":"ج",
+      "ch":"چ",
+      "h":"ح",
+      "kh":"خ",
+      "d":"د",
+      "za":"ذ", //conflict
+      "r":"ر",
+      "z":"ز", // conflict
+      "zh":"ژ",
+      "s": "س", // conflict
+      "sh":"ش",
+      "sz":"ص", // conflict
+      "zx":"ض", // conflict
+      "ta":"ط", //conflict
+      "zy":"ظ", //conflict
+      "*":"ع", //weird
+      "gh":"غ",
+      "f":"ف",
+      "q":"ق", //conflict
+      "k":"ک",
+      "g":"گ",
+      "l":"ل",
+      "m":"م",
+      "n":"ن",
+      "v": "و",
+      "oo":"و",
+      "he":"ه", // conflict
+      "eh":"ه",
+      "ee":"ی",
+      "ye":"ی",
+      " ":" "
+    };
 
+    
 
-      // Each time the button is clicked, update the count.
-      inputPane.addEventListener('keydown', function(e) {
-        const inputText = e.key;
-        outputPane.value += inputText;
-      });
+    const inputPane = document.querySelector("textarea[name='inputPane']");
+    var outputPane = document.querySelector("textarea[name='outputPane']");
+    let englishText = "";
+    let persianText = outputPane.value;
+
+    inputPane.addEventListener('keydown', function(e) {
+      if (e.keyCode == 8) {
+        handleBackspace(e);
+      } else {
+        handleLetterInput(e);
+      } 
+    });
+
+    inputPane.addEventListener('input', hideOnEmpty);
+      function hideOnEmpty() {
+          var text = this.value;
+          if (text == ''){
+              outputPane.value = "";
+              englishText = "";   
+          }
     }
-  }
-  // Tell the browser to use our AstroHeart class for <astro-heart> elements.
-  customElements.define('astro-heart', Translator);
+
+
+
+   // translate english text into farsi text
+    function englishTextToPersianText(englishText:string) {
+      let fullFarsiText = "";
+      for (let i = 0; i < englishText.length; i++) {
+        let currentLetter = englishText.charAt(i);
+        let currentText = englishText.substring(0,i+1);
+        
+        // when should i just add one letter?
+        if (shouldJustAddCurrentLetter(currentText)) {
+          fullFarsiText += getFarsiLetterFromMap(currentLetter);
+        // do I need to merge letters?
+        } else if (shouldMergeCurrentLetter(currentText)) {
+          let previousLetter = englishText.charAt(i-1);
+          fullFarsiText = backspaceIfRequired(previousLetter, fullFarsiText);
+          fullFarsiText += getFarsiLetterFromMap(previousLetter+currentLetter);
+        } 
+      }
+
+      return fullFarsiText;
+    }
+
+    /*
+    Should only add current letter if:
+    (1) previous letter is empty
+    (2) canMerge -> false
+    (2) previous two-letters were merged OR can't make an existing merge
+    (4) AND key exists in map
+
+    */
+    function shouldJustAddCurrentLetter(englishText: string) {
+      let length = englishText.length;
+      let currentLetter = englishText.charAt(length-1);
+      let previousLetter = "~";
+      let previousTwoLetters = "~";
+      if (length >= 1) {
+        previousLetter = englishText.charAt(length - 2);
+      }
+      if (length > 2) {
+        previousTwoLetters = englishText.substring(length - 3, length -1);
+      }
+      let letterExists = englishFarsiMap[currentLetter] != null;
+
+      let previousLetterIsEmpty = previousLetter.length == 0 || previousLetter == " ";
+      if (previousLetterIsEmpty) return letterExists;
+      let canMergeLetters = englishFarsiMap[previousLetter+currentLetter] != null;
+      if (canMergeLetters) return false;
+      let previous2LettersWereMerged = length > 2 && englishFarsiMap[previousTwoLetters] != null;
+      if (previous2LettersWereMerged) return true;
+     
+
+
+      return letterExists;
+
+    }
+
+    /*
+    Should only merge letter if:
+    (1) text is >= than size 2
+    (2) AND previous two letters weren't merged
+    (3) AND previousLetter + currentLetter exists
+    */
+    function shouldMergeCurrentLetter(englishText: string) {
+      let length = englishText.length;
+      let currentLetter = englishText.charAt(length-1);
+      let previousLetter = englishText.charAt(length - 2);
+      let previousTwoLetters = "~";
+      if (length > 2) {
+        previousTwoLetters = englishText.substring(length - 3, length -1);
+      }
+
+      let hasValidLength = length >= 2;
+      let previous2LettersWerentMerged = englishFarsiMap[previousTwoLetters] == null;
+      let canMergeLetters = englishFarsiMap[previousLetter+currentLetter] != null;
+
+      return hasValidLength && previous2LettersWerentMerged && canMergeLetters;
+    }
+
+
+    /*
+    Should backspace only if it added a letter prior that exists in map and is non-empty
+    */
+    function backspaceIfRequired(previousLetter, fullFarsiText) {
+      let farsiValue = englishFarsiMap[previousLetter];
+      if (farsiValue != null && farsiValue.length > 0) {
+        return fullFarsiText.substring(0, fullFarsiText.length-1);
+      }
+      return fullFarsiText;
+    }
+
+    /*
+    Return letter if it exists in farsi map
+    */
+    function getFarsiLetterFromMap(letter) {
+      if (englishFarsiMap[letter] == null) {
+        return "";
+      }
+      return englishFarsiMap[letter];
+    }
+
+    function handleLetterInput(e) {
+      let currentLetter = e.key;
+  //    if (currentLetter.match(/[a-zA-Z]/)) {
+            englishText += currentLetter;
+            persianText = englishTextToPersianText(englishText);
+            outputPane.value = persianText;
+  //    }   
+    }
+
+    function handleBackspace(e) {
+      if (e.keyCode == 8) {
+        englishText = englishText.substring(0,englishText.length-1);
+        persianText = englishTextToPersianText(englishText);
+        outputPane.value = persianText;
+      }
+    }
+
+
+
+
+
+
+
 </script>
